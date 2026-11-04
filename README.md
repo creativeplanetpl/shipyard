@@ -35,7 +35,7 @@ reviewer gates actually refuse a write — a green round-trip with a broken gate
 is the one failure that would otherwise look healthy.
 
 If you already keep any of `astra.md`, `fable.md`, `codex.md`,
-`opus-reviewer.md`, `sonnet-implementer.md`, `grok-implementer.md`,
+`opus-reviewer.md`, `sonnet-implementer.md`, `grok-implementer.md`, `bonsai-implementer.md`,
 `grok-reviewer.md` or `mythos.md` in
 `~/.claude/agents/`, delete them after installing — the plugin ships the same
 names and duplicates are confusing. Shipyard 0.4 and earlier shipped a
@@ -52,6 +52,7 @@ one too.
 | Opus | `opus-reviewer` | Claude Opus | read-only |
 | Sonnet | `sonnet-implementer` | Claude Sonnet 5.5 | write |
 | Grok | `grok-implementer` | grok-4.7, xhigh reasoning | write |
+| Bonsai | `bonsai-implementer` | Ternary-Bonsai-2-27B via `claude-local` (opt-in) | write, edits only |
 | Grok | `grok-reviewer` | grok-4.7, xhigh reasoning | read-only |
 | Mythos | `mythos` | Claude Mythos 5.1 (opt-in security scan) | read-only |
 
@@ -70,7 +71,7 @@ build doesn't recognise the `fable` or `sonnet` alias, use the full ID
 ## The pipeline
 
 1. **Plan** — Astra turns the spec into a plan, split into small tasks,
-   marking which are independent and tagging each `EASY`, `ROUTINE` or `HARD`.
+   marking which are independent and tagging each `TRIVIAL`, `EASY`, `ROUTINE` or `HARD`.
 2. **Plan review** — Fable, Grok and a *fresh* Astra attack the plan on paper,
    in parallel. The second Astra is a new dispatch and a new `codex exec`: it
    gets the spec and the plan text, never the planning run's context.
@@ -79,7 +80,8 @@ build doesn't recognise the `fable` or `sonnet` alias, use the full ID
    (full, then a delta if blockers were folded); residual nits travel with
    the tasks rather than looping.
 3. **Implement** — one agent per task, all dispatched at once, each in its own
-   git worktree so parallel file edits can't collide. `EASY` tasks go to
+   git worktree so parallel file edits can't collide. `TRIVIAL` tasks go to
+   Bonsai (or Luna, see [Local Bonsai tier](#local-bonsai-tier)), `EASY` ones to
    Luna, `ROUTINE` ones to Grok, `HARD` ones to Sonnet. Luna and Grok are
    sandboxed to their worktree, Sonnet only by its instructions (see [How the
    roles are confined](#how-the-roles-are-confined)). Each agent commits in
@@ -114,6 +116,21 @@ Any non-empty value counts, `0` and `false` included — it's a switch, not a
 boolean. This env var is the *only* way to run without Grok: with it unset, a
 missing or unauthenticated `grok` stops the pipeline exactly like a missing
 `codex` would, rather than quietly shipping with one less reviewer.
+
+## Local Bonsai tier
+
+Set `CLAUDE_LOCAL_AVAILABLE=1` and `TRIVIAL` tasks (the exact edit is stated in
+the task, no command needed to finish it) go to `bonsai-implementer`, which runs
+a self-hosted Ternary-Bonsai-2-27B through the `claude-local` wrapper. Unset,
+they go to Luna with the `EASY` ones. Opus still reviews every commit.
+
+```json
+{ "env": { "CLAUDE_LOCAL_AVAILABLE": "1" } }
+```
+
+Bonsai runs headless with `--permission-mode acceptEdits` and no `Bash`, so it
+can edit its worktree and nothing else; the wrapper commits. Once on, an
+unreachable `claude-local` stops the pipeline instead of falling back to Luna.
 
 ## Security scan
 

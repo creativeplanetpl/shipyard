@@ -17,12 +17,15 @@ Five stages, in order. No skipping, no reordering.
 | Opus | `opus-reviewer` | Claude Opus | read-only |
 | Sonnet | `sonnet-implementer` | Claude Sonnet 5.5 | write |
 | Grok | `grok-implementer` | grok-4.7, xhigh | write |
+| Bonsai | `bonsai-implementer` | Ternary-Bonsai-2-27B via `claude-local` (opt-in) | write, edits only |
 | Grok | `grok-reviewer` | grok-4.7, xhigh | read-only |
 | Mythos | `mythos` | Claude Mythos 5.1 (opt-in) | read-only |
 
 Every review in this pipeline is **adversarial** — Fable, Astra, Grok, Opus and Mythos all hunt for reasons to reject. The gate is blockers, not an empty findings list. `EXECUTE AS-IS` / `MERGE AS-IS` / `APPROVE` mean no blockers, not praise. `grok-reviewer` returns no verdict word at all — its blocker list *is* its verdict, because its verdicts ran lenient while its findings ran sharp. Astra wrote the plan and reviews it again in stage 2, and the branch in stage 5; the fresh dispatch is what keeps that honest — a new subagent, a new `codex exec`, none of the planning context.
 
 **Grok is optional, and the env var is the only switch.** Before stage 2, run `printenv SHIPYARD_NO_GROK`. Any non-empty value (use `1`) turns Grok off for this project, which changes exactly three dispatch sites: stage 2 drops `grok-reviewer` (leaving Fable and a fresh Astra), stage 3 routes ROUTINE tasks to `codex` along with the easy ones (HARD still goes to `sonnet-implementer`), stage 5 drops `grok-reviewer`. Say once, in stage 2, that Grok is disabled; every gate stays as it is. With the var unset, a missing or unauthenticated `grok` is a hard stop exactly like a missing `codex` — report it and wait, don't decide for yourself to run without Grok.
+
+**The local Bonsai tier is opt-in, and the env var is the only switch.** Before stage 2, also run `printenv CLAUDE_LOCAL_AVAILABLE`. Any non-empty value routes stage-3 `TRIVIAL` tasks to `bonsai-implementer`; unset, `TRIVIAL` goes to `codex` with the easy ones. Nothing else changes — Opus still reviews every Bonsai commit. Say once, in stage 2, that the local tier is enabled. With the var set, an unreachable `claude-local` is a hard stop exactly like a missing `codex` — report it and wait.
 
 **The security scan is opt-in, and the env var is the only switch.** Before stage 2, also run `printenv SHIPYARD_SECURITY_SCAN`. Any non-empty value (use `1`) adds `mythos` to stage 5 as one more enabled reviewer: it is dispatched in the same message as the others, its blockers gate the PR like theirs, and it is re-dispatched as a delta on every repair. Nothing else changes. Say once, in stage 2, that the security scan is enabled. With the var set, a `mythos` dispatch that fails because the model is unavailable is a hard stop exactly like a missing `codex` — report it and wait, never open the PR without the scan.
 
@@ -44,7 +47,7 @@ None of them sees this conversation. Every dispatch prompt must be self-containe
 
 ## Stages
 
-**1. Plan — Astra.** `Agent(subagent_type: "astra")` with the spec or brief and everything the user said about it. Astra returns the plan, broken into small tasks, with the independent ones marked and each tagged `EASY`, `ROUTINE` or `HARD`. You own it from there: read it, and send it back if it missed the ask or left tasks untagged.
+**1. Plan — Astra.** `Agent(subagent_type: "astra")` with the spec or brief and everything the user said about it. Astra returns the plan, broken into small tasks, with the independent ones marked and each tagged `TRIVIAL`, `EASY`, `ROUTINE` or `HARD`. You own it from there: read it, and send it back if it missed the ask or left tasks untagged.
 
 **2. Plan review — Fable + Astra + Grok.** Dispatch `fable`, `astra` and `grok-reviewer` in one message so they run in parallel, each given the original spec *and* the plan — a reviewer holding only the plan cannot see a requirement the plan dropped. The `astra` dispatch is a fresh one: it carries the spec and the plan text, never the planning run's context or session id, so it reads its own plan as a stranger's.
 
@@ -60,11 +63,11 @@ Cap at two rounds (one full, one delta). After round 2:
 
 **Implementation starts when every enabled reviewer has an empty blocker list on the current plan, or when round 2 closed with only nits and risks remaining** (with `SHIPYARD_NO_GROK` set, that set is Fable and Astra). Nothing else opens the gate. Where reviewers contradict each other on a non-blocking finding, say which you took and why.
 
-**3. Implement — Luna, Grok and Sonnet.** **Create each worktree yourself, before dispatching**, and pass its absolute path in the brief: `git worktree add <root>/<repo>-<task-slug> -b <branch>`. Then dispatch one agent per task, all in a single message so they run in parallel.
+**3. Implement — Bonsai, Luna, Grok and Sonnet.** **Create each worktree yourself, before dispatching**, and pass its absolute path in the brief: `git worktree add <root>/<repo>-<task-slug> -b <branch>`. Then dispatch one agent per task, all in a single message so they run in parallel.
 
-Do **not** use `isolation: "worktree"`. It picks its own path, and you need the path in advance for three things: a project's own convention for where worktrees live, seeding the tree so the agent can build (dependencies, build artifacts, submodule sources — a bare worktree usually cannot compile or run tests), and `grok-implementer`'s `--sandbox workspace`, whose confinement root *is* that path. Verify the tree compiles before you dispatch; an agent that cannot run the suite will report a gate it never ran. Route by the plan's tag: `EASY` → `codex`, `ROUTINE` → `grok-implementer`, `HARD` → `sonnet-implementer`. Include residual stage-2 nits and risks in each brief as non-blocking notes. Each wrapper commits in its own worktree; the inner CLI does not. `sonnet-implementer` has no inner CLI and commits its own work.
+Do **not** use `isolation: "worktree"`. It picks its own path, and you need the path in advance for three things: a project's own convention for where worktrees live, seeding the tree so the agent can build (dependencies, build artifacts, submodule sources — a bare worktree usually cannot compile or run tests), and `grok-implementer`'s `--sandbox workspace`, whose confinement root *is* that path. Verify the tree compiles before you dispatch; an agent that cannot run the suite will report a gate it never ran. Route by the plan's tag: `TRIVIAL` → `bonsai-implementer` (`codex` when `CLAUDE_LOCAL_AVAILABLE` is unset), `EASY` → `codex`, `ROUTINE` → `grok-implementer`, `HARD` → `sonnet-implementer`. Include residual stage-2 nits and risks in each brief as non-blocking notes. Each wrapper commits in its own worktree; the inner CLI does not. `sonnet-implementer` has no inner CLI and commits its own work.
 
-**4. Task review — Opus.** As each task finishes, `Agent(subagent_type: "opus-reviewer")` on that worktree's commit plus the plan step it implements. `FIX` (non-empty blockers) → back to the *same* implementer agent (`codex`, `grok-implementer` or `sonnet-implementer`) in the *same* worktree, then re-review. `APPROVE` (empty blockers, nits allowed) → merge that worktree branch into the working branch (you resolve conflicts).
+**4. Task review — Opus.** As each task finishes, `Agent(subagent_type: "opus-reviewer")` on that worktree's commit plus the plan step it implements. `FIX` (non-empty blockers) → back to the *same* implementer agent (`bonsai-implementer`, `codex`, `grok-implementer` or `sonnet-implementer`) in the *same* worktree, then re-review. `APPROVE` (empty blockers, nits allowed) → merge that worktree branch into the working branch (you resolve conflicts).
 
 A task is done only when approved **and** merged.
 
@@ -84,7 +87,7 @@ This stage gates the branch's *final* state, so a verdict dies the moment the di
 - Full re-review of a plan or branch after a fold → that is a delta. A new first pass is how nits regenerate.
 - Starting a third stage-2 round on your own → stop and ask.
 - Folding nits as if they were blockers, or looping until findings are zero → the gate is blockers.
-- Sending a task to any implementer but the one its tag names (`EASY` → `codex`, `ROUTINE` → `grok-implementer`, `HARD` → `sonnet-implementer`; `ROUTINE` → `codex` only when `SHIPYARD_NO_GROK` is set) → the tag exists to pick the model; follow it.
+- Sending a task to any implementer but the one its tag names (`TRIVIAL` → `bonsai-implementer`, or `codex` when `CLAUDE_LOCAL_AVAILABLE` is unset; `EASY` → `codex`, `ROUTINE` → `grok-implementer`, `HARD` → `sonnet-implementer`; `ROUTINE` → `codex` only when `SHIPYARD_NO_GROK` is set) → the tag exists to pick the model; follow it.
 - Merging a Sonnet worktree without checking the main checkout for stray writes → it has no sandbox; the check is the only gate.
 - Deciding for yourself that Grok is "not needed" → `SHIPYARD_NO_GROK` is the user's switch, not your call.
 - Opening the PR with `SHIPYARD_SECURITY_SCAN` set but no `mythos` pass on the current diff → the scan is a stage-5 gate once enabled; an unavailable model stops the pipeline, it doesn't skip the scan.

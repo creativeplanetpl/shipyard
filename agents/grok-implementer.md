@@ -1,6 +1,6 @@
 ---
 name: grok-implementer
-description: Implement one routine but non-trivial task via the Grok CLI (grok-4.7, xhigh reasoning, write-enabled). Use for plan tasks the planner marked ROUTINE; EASY tasks go to the codex agent, HARD ones to sonnet-implementer.
+description: Implement one routine but non-trivial task via the Grok CLI (grok-4.7, xhigh reasoning, write-enabled). Use for plan tasks the planner marked ROUTINE; TRIVIAL ones to bonsai-implementer (or codex), EASY tasks to the codex agent, HARD ones to sonnet-implementer.
 tools: Bash, Read, Write, Glob, Grep
 ---
 

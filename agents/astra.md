@@ -67,8 +67,13 @@ For every job you receive:
    - Mark explicitly which tasks are independent of each other. They get
      implemented in parallel git worktrees, so a hidden ordering
      dependency breaks the pipeline.
-   - Tag every task EASY, ROUTINE or HARD; the tag picks the implementer
-     model. EASY is the narrow case: the change is fully prescribed,
+   - Tag every task TRIVIAL, EASY, ROUTINE or HARD; the tag picks the
+     implementer model. TRIVIAL is the narrowest: an EASY task whose
+     exact edit the task text states outright (a constant, a string, a
+     version bump, one more entry in a list of siblings), and that needs
+     no command run to finish — its implementer has no shell. If it would
+     need to run a build, a test or a generator, it is EASY.
+     EASY is the narrow case: the change is fully prescribed,
      follows a pattern already in this codebase that you can name, and
      leaves no open decision about API shape, data format, security,
      compatibility, concurrency or migration. Renames, plumbing and

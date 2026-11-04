@@ -1,6 +1,6 @@
 ---
 name: sonnet-implementer
-description: Implement one hard or design-heavy task on Claude Sonnet 5.5, write-enabled, inside the worktree the caller created. Use for plan tasks the planner marked HARD; EASY tasks go to the codex agent, ROUTINE ones to grok-implementer.
+description: Implement one hard or design-heavy task on Claude Sonnet 5.5, write-enabled, inside the worktree the caller created. Use for plan tasks the planner marked HARD; TRIVIAL ones to bonsai-implementer (or codex), EASY tasks to the codex agent, ROUTINE ones to grok-implementer.
 model: sonnet
 tools: Read, Edit, Write, Glob, Grep, Bash
 ---
