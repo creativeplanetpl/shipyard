@@ -5,7 +5,12 @@ adversarial reviewers across three labs try to kill it, Codex, Grok and Sonnet
 agents implement every independent task in parallel git worktrees, and nothing merges
 until Fable, Astra and Grok have all attacked the integrated diff.
 
-Six models, five stages. Reviews hunt for reasons to reject; the gate is
+Not every change needs all of that. Before planning, the session triages the
+spec: large or hard work gets the full shipyard, everything else goes to
+[boatyard](#boatyard), the same five stages and gates with a smaller, cheaper
+crew (Opus plans, Sonnet reviews each task).
+
+Reviews hunt for reasons to reject; the gate is
 blockers, not an empty findings list. Astra reviews the plan it wrote and the
 branch built from it — as fresh dispatches that carry none of the planning
 context, and are told to distrust both.
@@ -28,15 +33,20 @@ context, and are told to distrust both.
   shell out to `grok --prompt-file`. Required unless you switch Grok off — see
   [Turning Grok off](#turning-grok-off).
 - Git, for the worktree isolation used during implementation.
+- Optional: a `claude-local` launcher on `PATH`, a Claude Code wrapper pointed
+  at a self-hosted Bonsai model. Only needed if you turn on the
+  [local Bonsai tier](#local-bonsai-tier).
 
-Run `/shipyard:doctor` to check both CLIs before you rely on them. It exercises
+Run `/shipyard:doctor` to check both CLIs (and `claude-local`, when the Bonsai
+tier is on) before you rely on them. It exercises
 the exact delegation form the wrappers use, and asserts that the read-only
 reviewer gates actually refuse a write — a green round-trip with a broken gate
 is the one failure that would otherwise look healthy.
 
 If you already keep any of `astra.md`, `fable.md`, `opus.md`, `codex.md`,
-`opus-reviewer.md`, `sonnet-reviewer.md`, `sonnet-implementer.md`, `grok-implementer.md`, `bonsai-implementer.md`,
-`grok-reviewer.md` or `mythos.md` in
+`opus-reviewer.md`, `sonnet-reviewer.md`, `sonnet-implementer.md`,
+`grok-implementer.md`, `bonsai-implementer.md`, `grok-reviewer.md` or
+`mythos.md` in
 `~/.claude/agents/`, delete them after installing — the plugin ships the same
 names and duplicates are confusing. Shipyard 0.4 and earlier shipped a
 `sol-reviewer` agent; `astra` replaces it, so delete any stale copy of that
@@ -44,25 +54,25 @@ one too.
 
 ## The cast
 
-| Name | Agent | Model | Access |
-| --- | --- | --- | --- |
-| Astra | `astra` | gpt-6-astra, medium reasoning | read-only |
-| Fable | `fable` | Claude Fable | read-only |
-| Luna | `codex` | gpt-6-luna, max reasoning | write |
-| Opus | `opus-reviewer` | Claude Opus | read-only |
-| Opus | `opus` | Claude Opus (boatyard plan + reviews) | read-only |
-| Sonnet | `sonnet-reviewer` | Claude Sonnet (boatyard task review) | read-only |
-| Sonnet | `sonnet-implementer` | Claude Sonnet 5.5 | write |
-| Grok | `grok-implementer` | grok-4.7, xhigh reasoning | write |
-| Bonsai | `bonsai-implementer` | Ternary-Bonsai-2-27B via `claude-local` (opt-in) | write, edits only |
-| Grok | `grok-reviewer` | grok-4.7, xhigh reasoning | read-only |
-| Mythos | `mythos` | Claude Mythos 5.1 (opt-in security scan) | read-only |
+| Name | Agent | Model | Access | Used in |
+| --- | --- | --- | --- | --- |
+| Astra | `astra` | gpt-6-astra, medium reasoning | read-only | shipyard: plan, plan + branch review |
+| Fable | `fable` | Claude Fable | read-only | both: plan + branch review |
+| Opus | `opus` | Claude Opus | read-only | boatyard: plan, plan + branch review |
+| Opus | `opus-reviewer` | Claude Opus | read-only | shipyard: task review |
+| Sonnet | `sonnet-reviewer` | Claude Sonnet | read-only | boatyard: task review |
+| Grok | `grok-reviewer` | grok-4.7, xhigh reasoning | read-only | shipyard: plan + branch review |
+| Bonsai | `bonsai-implementer` | Ternary-Bonsai-2-27B via `claude-local` (opt-in) | write, edits only | both: `TRIVIAL` tasks |
+| Luna | `codex` | gpt-6-luna, max reasoning | write | both: `EASY` tasks, plus fallbacks |
+| Grok | `grok-implementer` | grok-4.7, xhigh reasoning | write | both: `ROUTINE` tasks |
+| Sonnet | `sonnet-implementer` | Claude Sonnet 5.5 | write | shipyard: `HARD` tasks |
+| Mythos | `mythos` | Claude Mythos 5.1 (opt-in security scan) | read-only | both: branch review |
 
 Every name is a model, pinned in the agent definition — frontmatter for the
 Claude agents, a CLI argument for the wrappers. **Your session model
 doesn't matter** — start on Opus, Sonnet or Haiku and the plan is still written
 by Astra and the branch still reviewed by Fable, Astra and Grok, because every
-stage is a dispatch to a pinned agent. Your session orchestrates: it dispatches, merges,
+stage is a dispatch to a pinned agent (Opus and Fable in boatyard). Your session orchestrates: it dispatches, merges,
 resolves conflicts, and talks to you.
 
 Swap the model IDs in `agents/*.md` for whatever your accounts have. If your
@@ -70,13 +80,33 @@ build doesn't recognise the `fable` or `sonnet` alias, use the full ID
 `claude-fable-5` or `claude-sonnet-5-5`;
 `agents/astra.md` pins `gpt-6-astra` on the Codex side.
 
+## Triage: shipyard or boatyard
+
+Before stage 1, the session decides which pipeline the spec gets:
+
+- **Shipyard** if the work is **large or hard**: more than five tasks expected,
+  more than one module or service touched, or an open decision about API
+  shape, data format, security, compatibility, concurrency or migration. Also
+  when you ask for the strongest models.
+- **Boatyard** otherwise.
+
+When unsure, it picks shipyard. It tells you the call and the reason in one
+line and carries on; say "use shipyard" or "use boatyard" to override.
+
+## Task tiers
+
+The planner tags every task, and the tag picks the implementer:
+
+| Tag | Means | Implementer |
+| --- | --- | --- |
+| `TRIVIAL` | The task states the exact edit (a constant, a string, a version bump, one more list entry) and nothing needs running to finish it | Bonsai, or Luna if the [local tier](#local-bonsai-tier) is off |
+| `EASY` | Fully prescribed, and follows a pattern already in the codebase | Luna |
+| `ROUTINE` | No open design decision, but the implementer works out the how | Grok, or Luna if [Grok is off](#turning-grok-off) |
+| `HARD` | Leaves open an API, data format, security, compatibility, concurrency or migration decision | Sonnet (shipyard only) |
+
 ## The pipeline
 
-Before stage 1 the session triages the spec. **Large or hard** work (more than
-five tasks, more than one module or service, or an open decision about API
-shape, data format, security, compatibility, concurrency or migration) gets
-the full shipyard below. Everything else goes to [boatyard](#boatyard). When
-unsure, shipyard; say "use shipyard" or "use boatyard" to override.
+The full shipyard:
 
 1. **Plan** — Astra turns the spec into a plan, split into small tasks,
    marking which are independent and tagging each `TRIVIAL`, `EASY`, `ROUTINE` or `HARD`.
@@ -111,22 +141,39 @@ shipyard".
 
 ## Boatyard
 
-The same five stages and gates with a smaller crew:
+The same five stages and the same gates as shipyard, with a smaller crew. Every
+shipyard rule still applies: worktrees per task, blockers gate and verdict words
+don't, at most two plan-review rounds, delta re-reviews after every fix.
 
-1. **Plan** — Opus, tagging tasks `TRIVIAL`, `EASY` or `ROUTINE`.
-2. **Plan review** — Fable and a fresh Opus.
-3. **Implement** — Bonsai (or Luna), Luna and Grok (or Luna) by tag. No Sonnet.
-4. **Task review** — Sonnet.
-5. **Branch review** — a fresh Opus and Fable, plus Mythos if the security
-   scan is on.
+| Stage | Shipyard | Boatyard |
+| --- | --- | --- |
+| 1. Plan | Astra | Opus |
+| 2. Plan review | Fable, fresh Astra, Grok | Fable, fresh Opus |
+| 3. Implement | Bonsai / Luna / Grok / Sonnet by tag | Bonsai / Luna / Grok by tag |
+| 4. Task review | Opus | Sonnet |
+| 5. Branch review | Fable, Astra, Grok (+ Mythos) | fresh Opus, Fable (+ Mythos) |
 
-If any task turns out `HARD`, boatyard stops and the job restarts in shipyard.
+- **The Opus reviews are fresh dispatches.** They get the spec and the plan or
+  diff, never the planning run's context, so the reviewer doesn't share the
+  author's blind spots.
+- **A `HARD` task means the triage was wrong.** If the plan, a plan reviewer or
+  a branch fix calls a task `HARD`, boatyard stops, says which task and why, and
+  restarts in shipyard from stage 1. Work already merged stays on the branch.
+- **The switches behave the same.** `CLAUDE_LOCAL_AVAILABLE` and
+  `SHIPYARD_NO_GROK` change implementer routing exactly as in shipyard, and
+  `SHIPYARD_SECURITY_SCAN` adds Mythos to the branch review.
+- **The trade-off:** planning and every review stay with Anthropic models, so
+  boatyard gives up shipyard's cross-lab independence in exchange for speed and
+  cost. That's why anything large or hard goes to shipyard.
+
+The boatyard rules live in `skills/shipping-plans-with-agents/boatyard.md`.
 
 ## Turning Grok off
 
 Set `SHIPYARD_NO_GROK=1` and the two Grok roles drop out: the plan gets reviewed
 by Fable and the fresh Astra, `ROUTINE` tasks go to Luna with the easy ones, and
-the branch review runs Fable + Astra. The stage gates are unchanged. In
+the branch review runs Fable + Astra. Boatyard has no Grok reviewer, so there
+the switch only moves `ROUTINE` tasks to Luna. The stage gates are unchanged. In
 `.claude/settings.json`:
 
 ```json
@@ -143,7 +190,9 @@ missing or unauthenticated `grok` stops the pipeline exactly like a missing
 Set `CLAUDE_LOCAL_AVAILABLE=1` and `TRIVIAL` tasks (the exact edit is stated in
 the task, no command needed to finish it) go to `bonsai-implementer`, which runs
 a self-hosted Ternary-Bonsai-2-27B through the `claude-local` wrapper. Unset,
-they go to Luna with the `EASY` ones. Opus still reviews every commit.
+they go to Luna with the `EASY` ones. Works the same in shipyard and boatyard,
+and every Bonsai commit is still reviewed (by Opus in shipyard, Sonnet in
+boatyard).
 
 ```json
 { "env": { "CLAUDE_LOCAL_AVAILABLE": "1" } }
@@ -152,6 +201,8 @@ they go to Luna with the `EASY` ones. Opus still reviews every commit.
 Bonsai runs headless with `--permission-mode acceptEdits` and no `Bash`, so it
 can edit its worktree and nothing else; the wrapper commits. Once on, an
 unreachable `claude-local` stops the pipeline instead of falling back to Luna.
+`/shipyard:doctor` checks both: a round-trip, and that a write outside the
+worktree is refused.
 
 ## Security scan
 
@@ -189,6 +240,13 @@ Every flag in the two grok commands is load-bearing, so don't trim them:
 - **Luna has the same commit split.** `--sandbox workspace-write` does not
   include a linked worktree's git index, so the `codex` wrapper commits.
   Do not add the git common dir as a writable root to paper over this.
+- **`bonsai-implementer` is confined by Claude Code permissions.** It runs
+  `claude-local -p --permission-mode acceptEdits --disallowedTools
+  Bash,WebFetch,WebSearch --strict-mcp-config` from inside its worktree. Edits
+  there are approved; anything outside needs an approval nobody can give
+  headlessly, so it is refused. No Bash means no shell to escape through, and
+  `--strict-mcp-config` drops MCP servers. `acceptEdits` matters: it overrides
+  any looser `defaultMode` in the `claude-local` config. The wrapper commits.
 - **`sonnet-implementer` has no sandbox.** It is a native Claude subagent,
   held to its worktree by its instructions alone, so the orchestrator checks
   the main checkout after every Sonnet task and won't merge one that wrote
@@ -214,6 +272,11 @@ no planning context, nothing to be loyal to.
 
 Because the roles are pinned models rather than "whatever is running", that
 independence doesn't quietly disappear when you switch your session model.
+
+Boatyard deliberately trades some of this away: its planner and reviewers are
+all Anthropic models. Fresh dispatches still keep the reviewers away from the
+planner's context, but they share a lab. Triage keeps that to work small and
+simple enough for the trade to be worth it.
 
 ## Adapting it
 
