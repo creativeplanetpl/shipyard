@@ -1,6 +1,6 @@
 ---
 name: fable
-description: Adversarially reviews the implementation plan (stage 2) and the integrated branch diff (stage 5) of the shipyard pipeline, always on the Fable model. Read-only.
+description: Adversarially reviews the implementation plan (stage 2) and the integrated branch diff (stage 5) of both shipyard and boatyard, always on the Fable model. Read-only.
 model: fable
 tools: Read, Glob, Grep, Bash
 ---

@@ -34,8 +34,8 @@ the exact delegation form the wrappers use, and asserts that the read-only
 reviewer gates actually refuse a write — a green round-trip with a broken gate
 is the one failure that would otherwise look healthy.
 
-If you already keep any of `astra.md`, `fable.md`, `codex.md`,
-`opus-reviewer.md`, `sonnet-implementer.md`, `grok-implementer.md`, `bonsai-implementer.md`,
+If you already keep any of `astra.md`, `fable.md`, `opus.md`, `codex.md`,
+`opus-reviewer.md`, `sonnet-reviewer.md`, `sonnet-implementer.md`, `grok-implementer.md`, `bonsai-implementer.md`,
 `grok-reviewer.md` or `mythos.md` in
 `~/.claude/agents/`, delete them after installing — the plugin ships the same
 names and duplicates are confusing. Shipyard 0.4 and earlier shipped a
@@ -50,6 +50,8 @@ one too.
 | Fable | `fable` | Claude Fable | read-only |
 | Luna | `codex` | gpt-6-luna, max reasoning | write |
 | Opus | `opus-reviewer` | Claude Opus | read-only |
+| Opus | `opus` | Claude Opus (boatyard plan + reviews) | read-only |
+| Sonnet | `sonnet-reviewer` | Claude Sonnet (boatyard task review) | read-only |
 | Sonnet | `sonnet-implementer` | Claude Sonnet 5.5 | write |
 | Grok | `grok-implementer` | grok-4.7, xhigh reasoning | write |
 | Bonsai | `bonsai-implementer` | Ternary-Bonsai-2-27B via `claude-local` (opt-in) | write, edits only |
@@ -69,6 +71,12 @@ build doesn't recognise the `fable` or `sonnet` alias, use the full ID
 `agents/astra.md` pins `gpt-6-astra` on the Codex side.
 
 ## The pipeline
+
+Before stage 1 the session triages the spec. **Large or hard** work (more than
+five tasks, more than one module or service, or an open decision about API
+shape, data format, security, compatibility, concurrency or migration) gets
+the full shipyard below. Everything else goes to [boatyard](#boatyard). When
+unsure, shipyard; say "use shipyard" or "use boatyard" to override.
 
 1. **Plan** — Astra turns the spec into a plan, split into small tasks,
    marking which are independent and tagging each `TRIVIAL`, `EASY`, `ROUTINE` or `HARD`.
@@ -100,6 +108,19 @@ The full stage-by-stage instructions live in
 `skills/shipping-plans-with-agents/SKILL.md`, which your session loads on its
 own when a plan is ready to build. You can also just say "ship this with
 shipyard".
+
+## Boatyard
+
+The same five stages and gates with a smaller crew:
+
+1. **Plan** — Opus, tagging tasks `TRIVIAL`, `EASY` or `ROUTINE`.
+2. **Plan review** — Fable and a fresh Opus.
+3. **Implement** — Bonsai (or Luna), Luna and Grok (or Luna) by tag. No Sonnet.
+4. **Task review** — Sonnet.
+5. **Branch review** — a fresh Opus and Fable, plus Mythos if the security
+   scan is on.
+
+If any task turns out `HARD`, boatyard stops and the job restarts in shipyard.
 
 ## Turning Grok off
 

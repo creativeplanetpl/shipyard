@@ -1,11 +1,20 @@
 ---
 name: shipping-plans-with-agents
-description: Use when a spec, design, or implementation plan is ready to build and the work will be split across subagents — planning, plan review, parallel implementation in worktrees, per-task review, branch review, and PR.
+description: Use when a spec, design, or implementation plan is ready to build and the work will be split across subagents — triage into shipyard or boatyard, planning, plan review, parallel implementation in worktrees, per-task review, branch review, and PR.
 ---
 
 # Shipping Plans With Agents
 
 Five stages, in order. No skipping, no reordering.
+
+## Stage 0 — triage: shipyard or boatyard
+
+Before anything else, even before stage 1, decide which pipeline the spec gets:
+
+- **Shipyard** (everything below) if the work is **large or hard**: you expect more than five tasks, it crosses more than one module or service, or any part of it leaves open a decision about API shape, data format, security, compatibility, concurrency or migration. Also if the user asked for the strongest models.
+- **Boatyard** otherwise. Read `boatyard.md` next to this file; it swaps the cast and keeps every rule here.
+
+When unsure, it is shipyard. An explicit "use shipyard" / "use boatyard" from the user wins. Tell the user the call in one line, with the reason, then go on without waiting.
 
 ## Cast
 

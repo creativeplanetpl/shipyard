@@ -1,7 +1,7 @@
 {
   "name": "shipyard",
-  "version": "0.8.0",
-  "description": "Plan, adversarially review, implement in parallel worktrees, review again, ship. Bundles the astra, fable, codex, opus-reviewer, sonnet-implementer, grok-implementer, grok-reviewer, opt-in bonsai-implementer and opt-in mythos subagents, the workflow skill that drives them, and /shipyard:doctor to check the CLIs they delegate to.",
+  "version": "0.9.0",
+  "description": "Triage into full shipyard or lighter boatyard, then plan, adversarially review, implement in parallel worktrees, review again, ship. Bundles the astra, fable, opus, codex, opus-reviewer, sonnet-reviewer, sonnet-implementer, grok-implementer, grok-reviewer, opt-in bonsai-implementer and opt-in mythos subagents, the workflow skill that drives them, and /shipyard:doctor to check the CLIs they delegate to.",
   "author": {
     "name": "Piotr Szmielew",
     "url": "https://github.com/esse"

@@ -1,6 +1,6 @@
 ---
 name: opus-reviewer
-description: Adversarial review of one completed implementation task against its plan step. MUST BE USED after each task of the default workflow finishes, before the task is considered done. Read-only.
+description: Adversarial review of one completed implementation task against its plan step. MUST BE USED after each shipyard task finishes, before the task is considered done. Read-only.
 model: opus
 tools: Read, Glob, Grep, Bash
 ---
