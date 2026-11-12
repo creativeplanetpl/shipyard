@@ -85,7 +85,14 @@ yourself. If a CLI fails here, mark its round-trip checks below as `SKIP
    ```
 
    Pass only if Codex replies `DONE`, `ok.txt` contains `OK`, *and* the host
-   commit succeeded. A reply without the file means the sandbox flags aren't
+   commit succeeded. Read the transcript too: the file must come from an
+   `exec` line that `succeeded` (or `apply_patch`). If every `exec` failed —
+   on Windows typically `Failed to create unified exec process:
+   helper_unknown_error: setup refresh had errors` — and the file was written
+   through an MCP server such as `node_repl`, report `FAIL`: Luna has no
+   working shell, cannot run tests or builds, and its writes are not going
+   through the sandbox. The cause is in `~/.codex/.sandbox/sandbox.<date>.log`;
+   seen with Codex CLI 0.162 next to the Codex desktop app, gone in 0.167. A reply without the file means the sandbox flags aren't
    working; a file without a reply means the relay is broken; a file whose
    host commit failed means the wrapper cannot land Luna's work in a linked
    worktree.
@@ -127,6 +134,15 @@ expected rather than a fault.
    tail -1 ~/.grok/sessions/sandbox-events.jsonl
    ```
 
+   **On Windows report `N/A (Windows)` instead of running this**
+   (`printenv OS` prints `Windows_NT`). Grok's sandbox is Landlock on Linux
+   and Seatbelt on macOS; on Windows `--sandbox` enforces nothing and no
+   event file is written, so there is nothing to check and nothing to fix.
+   Say what that means, once, in the report: the reviewer is still read-only
+   through its tool allowlist and deny rules (check 5), while the implementer
+   is confined only by its worktree and the reviews that follow — its writes
+   outside the worktree are neither blocked nor detected.
+
 5. **The reviewer's read-only gate really denies** — the security-critical one.
    Run from the project directory, with the reviewer's exact flags, as one
    command so the temp path stays in scope:
@@ -140,7 +156,10 @@ expected rather than a fault.
    ```
 
    **Pass means `ls` says the file does not exist** and grok reported a denial
-   (`Operation not permitted`, or a `deny rule` message). If the file appears,
+   (`Operation not permitted`, or a `deny rule` message). On Windows the
+   sandbox half is absent, so grok instead reports that it has no write or
+   shell tool at all — that is the allowlist doing the job, and it passes as
+   long as the file does not exist. If the file appears,
    delete it and report a failure loudly: the reviewer is not read-only, so
    stage 2 and stage 5 have no gate.
 
@@ -190,5 +209,7 @@ restatement of the expectation. Then:
 - **A gate check fails while its round-trip passes** — the worst outcome, and
   say so plainly: delegation works, so the pipeline will appear healthy while
   running an agent that is not confined the way its own definition claims.
+  Grok's sandbox check on Windows is `N/A`, not a failed gate: the agent
+  definitions state that limit themselves.
 
 Never install, update, log in, or change a sandbox config to make a check pass.

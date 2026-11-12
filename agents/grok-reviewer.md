@@ -142,7 +142,8 @@ For every plan or spec you receive:
 
 4. Delete the prompt directory, then return grok's findings verbatim
    from `blockers:` onward, prefixed with one line stating the model,
-   reasoning level, and that the sandbox was enforced. Strip any
+   reasoning level, and that the sandbox was enforced (on Windows: that
+   there is no sandbox and the tool allowlist was the gate). Strip any
    preamble grok wrote before `blockers:` — its narration of what it
    was about to read is not a finding. There is no verdict word to
    relay; the blocker list is the result. If grok errored or produced
@@ -163,6 +164,13 @@ Rules:
   grok otherwise continues unprotected. Check for a `warning: sandbox
   could not be applied` line on stderr, and for `"enforced": true` on the
   last `ProfileApplied` event in `~/.grok/sessions/sandbox-events.jsonl`.
+- Windows is the exception (`printenv OS` prints `Windows_NT`): grok's
+  sandbox is Landlock/Seatbelt only, so there `--sandbox read-only`
+  enforces nothing, prints no warning and writes no event file. Skip
+  the check above instead of stopping. The run is still read-only,
+  because `--tools read_file,list_dir,grep` and the `--deny` rules leave
+  grok no write or shell tool — which makes those flags the *only* gate
+  on Windows. Never loosen them there.
 - With these flags grok has no shell of its own, so gather any
   `git diff` / `git log` / test output yourself and paste it into the
   prompt. That, and files grok cannot open, is the whole of what

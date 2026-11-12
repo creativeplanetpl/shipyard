@@ -65,7 +65,10 @@ For every task you receive:
      be applied` line on stderr, and the last `ProfileApplied` event in
      `~/.grok/sessions/sandbox-events.jsonl`, which carries `"enforced": true` when
      the profile really took effect. Reading only grok's answer will miss
-     this.
+     this. **Windows is the exception** (`printenv OS` prints
+     `Windows_NT`): grok has no sandbox there, no warning is printed and
+     no event file is written, so skip this check instead of stopping —
+     and say in your header line that the run was not sandboxed.
    - step 4 showed no changes at all — a run that wrote nothing has
      nothing to commit, and an empty commit is not a result.
 
@@ -94,6 +97,13 @@ Rules:
   required: MCP servers are their own processes, so a write-capable MCP
   tool is not covered by the sandbox at all. Never drop either flag to
   "simplify" the command.
+- The sandbox exists on Linux (Landlock) and macOS (Seatbelt) only. On
+  Windows `--sandbox workspace` is accepted and enforces nothing: grok
+  can write anywhere your user can, and nothing records it. Keep the
+  flag so the command is the same everywhere, but do not claim
+  confinement — there the worktree, the diff you commit and the reviews
+  that follow are the only containment, and `git status` in the worktree
+  will not show a write made outside it.
 - A built-in profile that fails to apply only *warns* and then runs
   unconfined, which you can detect but not prevent — hence the hard stop
   in step 5. A project that wants prevention rather than detection can
