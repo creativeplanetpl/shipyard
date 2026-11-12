@@ -16,6 +16,8 @@ Before anything else, even before stage 1, decide which pipeline the spec gets:
 
 When unsure, it is shipyard. An explicit "use shipyard" / "use boatyard" from the user wins. Tell the user the call in one line, with the reason, then go on without waiting.
 
+**Every run is a process with its own folder.** Read `process-layout.md` next to this file. If the run has no process folder yet, open one before stage 1 (it creates SPEC, PLAN, STATUS, DECISIONS, the `INDEX.md` row and the integration worktrees); record the triage call in STATUS.md. From then on every worktree lives in that process's `wt/`, every review is saved to `reviews/`, every brief to `briefs/`, and STATUS.md is updated whenever the stage changes or you stop to wait for the user. A run that stopped is picked up with `/shipyard:resume <process>`.
+
 ## Cast
 
 | Name | Agent | Model | Access |
@@ -72,7 +74,7 @@ Cap at two rounds (one full, one delta). After round 2:
 
 **Implementation starts when every enabled reviewer has an empty blocker list on the current plan, or when round 2 closed with only nits and risks remaining** (with `SHIPYARD_NO_GROK` set, that set is Fable and Astra). Nothing else opens the gate. Where reviewers contradict each other on a non-blocking finding, say which you took and why.
 
-**3. Implement — Bonsai, Luna, Grok and Sonnet.** **Create each worktree yourself, before dispatching**, and pass its absolute path in the brief: `git worktree add <root>/<repo>-<task-slug> -b <branch>`. Then dispatch one agent per task, all in a single message so they run in parallel.
+**3. Implement — Bonsai, Luna, Grok and Sonnet.** **Create each worktree yourself, before dispatching**, and pass its absolute path in the brief: `git worktree add <process>/wt/<repo>-<task-slug> -b shipyard/<process>-<task-slug>`, branched from the integration branch. Remove worktrees only with `scripts/Remove-ShipyardWorktree.ps1` — they may hold junctions. Then dispatch one agent per task, all in a single message so they run in parallel.
 
 Do **not** use `isolation: "worktree"`. It picks its own path, and you need the path in advance for three things: a project's own convention for where worktrees live, seeding the tree so the agent can build (dependencies, build artifacts, submodule sources — a bare worktree usually cannot compile or run tests), and `grok-implementer`'s `--sandbox workspace`, whose confinement root *is* that path. Verify the tree compiles before you dispatch; an agent that cannot run the suite will report a gate it never ran. Route by the plan's tag: `TRIVIAL` → `bonsai-implementer` (`codex` when `CLAUDE_LOCAL_AVAILABLE` is unset), `EASY` → `codex`, `ROUTINE` → `grok-implementer`, `HARD` → `sonnet-implementer`. Include residual stage-2 nits and risks in each brief as non-blocking notes. Each wrapper commits in its own worktree; the inner CLI does not. `sonnet-implementer` has no inner CLI and commits its own work.
 

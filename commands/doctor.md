@@ -1,5 +1,5 @@
 ---
-description: Check that the Codex and Grok CLIs actually work for delegation, and that the read-only reviewer gates really deny writes.
+description: Check which CLI (Claude, Codex, Grok) needs a fresh login, that Codex and Grok actually work for delegation, and that the read-only reviewer gates really deny writes.
 allowed-tools: Bash, Read
 ---
 
@@ -10,6 +10,38 @@ each result, and never fix anything — this command diagnoses.
 
 Do the work in a throwaway directory so nothing touches the user's tree:
 `d=$(mktemp -d)` in the same Bash call that uses it, and remove it after.
+
+Never print tokens, keys, e-mail addresses or org ids from any of these
+commands; report only logged-in / not, the method, and expiry dates.
+
+## Sign-in (run first, report first)
+
+The question this section answers is **which CLI needs a fresh login**. Run all
+three even if one fails; they are cheap and need no network round-trip beyond
+the status call.
+
+1. **Claude** — `claude auth status --json`. Pass if `loggedIn` is true. Report
+   `authMethod` and `loginExpiresAt`; warn if it expires within 3 days.
+2. **Codex** — `codex login status`. Pass only on a `Logged in …` line; report
+   the method it names (ChatGPT / API key).
+3. **Grok** — skip with a note if `SHIPYARD_NO_GROK` is set. Otherwise
+   `grok models`. Pass if it says `You are logged in` **and** lists the model the
+   agents pin (`grok-4.7`). Logged in but the model missing means the plan or
+   entitlement changed — the token belongs to the old plan, so this is a
+   re-login too, not a config problem.
+
+Report this section as a table before anything else:
+
+| CLI | Stan | Co zrobić |
+|---|---|---|
+| claude | OK / WYMAGA LOGOWANIA | `claude auth login` |
+| codex | … | `codex login` (or `codex login --device-auth` without a browser) |
+| grok | … | `grok logout`, then `grok login` (after a plan change, logout first) |
+
+Every login command opens a browser; in Claude Desktop the user runs it from
+the app's **Terminal** panel, not from a separate window. Do not run a login
+yourself. If a CLI fails here, mark its round-trip checks below as `SKIP
+(not signed in)` instead of running them into the same error.
 
 ## Codex (Astra, Luna)
 
