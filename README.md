@@ -278,6 +278,24 @@ all Anthropic models. Fresh dispatches still keep the reviewers away from the
 planner's context, but they share a lab. Triage keeps that to work small and
 simple enough for the trade to be worth it.
 
+## Processes and resuming
+
+Every run is a **process**: a folder under `SHIPYARD_HOME` holding its SPEC,
+PLAN, STATUS, DECISIONS, briefs, reviews and worktrees, plus a row in
+`INDEX.md`. The live checkout is never edited; work happens in the process's
+`wt/` on `shipyard/<process>` branches. A thread that stops can be picked up in
+a new one:
+
+```
+/shipyard:resume                # list open processes
+/shipyard:resume <process>      # read STATUS/SPEC/PLAN/DECISIONS and continue
+```
+
+`scripts/` has PowerShell helpers to open a process, remove worktrees safely
+when they contain NTFS junctions, and archive a finished process. Layout and
+rules: `skills/shipping-plans-with-agents/process-layout.md`. Running it all
+from Claude Desktop on Windows: `docs/desktop-setup.md`.
+
 ## Adapting it
 
 Everything is markdown. Common edits:
