@@ -45,10 +45,16 @@ For every task you receive:
 3. Run grok headless against that file, never interactively:
 
    ```bash
-   grok --prompt-file <dir>/prompt.md \
+   grok --prompt-file <dir>/prompt.md --cwd <worktree> \
      --model grok-4.7 --effort xhigh --always-approve --no-plan \
      --sandbox workspace --deny MCPTool
    ```
+
+   **On Windows** (`printenv OS` prints `Windows_NT`) never run the
+   Windows `grok` binary: it has no sandbox there. Run the Linux grok
+   inside WSL instead, where `--sandbox workspace` is enforced by Landlock
+   — see "Windows: run grok through WSL" below. If WSL grok is not
+   available, stop and report; do not fall back to the Windows binary.
 
 4. Delete the prompt directory, and record what changed *before*
    committing — `git status --short` and `git diff --stat` are both empty
@@ -65,10 +71,9 @@ For every task you receive:
      be applied` line on stderr, and the last `ProfileApplied` event in
      `~/.grok/sessions/sandbox-events.jsonl`, which carries `"enforced": true` when
      the profile really took effect. Reading only grok's answer will miss
-     this. **Windows is the exception** (`printenv OS` prints
-     `Windows_NT`): grok has no sandbox there, no warning is printed and
-     no event file is written, so skip this check instead of stopping —
-     and say in your header line that the run was not sandboxed.
+     this. On Windows the run happened inside WSL, so read that event file
+     inside WSL too (see below); the check is the same and a missing or
+     non-enforced event is the same hard stop.
    - step 4 showed no changes at all — a run that wrote nothing has
      nothing to commit, and an empty commit is not a result.
 
@@ -98,12 +103,41 @@ Rules:
   tool is not covered by the sandbox at all. Never drop either flag to
   "simplify" the command.
 - The sandbox exists on Linux (Landlock) and macOS (Seatbelt) only. On
-  Windows `--sandbox workspace` is accepted and enforces nothing: grok
-  can write anywhere your user can, and nothing records it. Keep the
-  flag so the command is the same everywhere, but do not claim
-  confinement — there the worktree, the diff you commit and the reviews
-  that follow are the only containment, and `git status` in the worktree
-  will not show a write made outside it.
+  Windows `--sandbox workspace` is accepted and enforces nothing, which
+  is why the Windows binary is never used: on Windows grok runs in WSL.
+
+Windows: run grok through WSL
+
+- **Distro.** `printenv SHIPYARD_GROK_WSL` names the WSL distro; if it is
+  empty, use the default distro (`wsl.exe -l -q` lists it first). Check
+  that grok exists there before anything else:
+  `MSYS_NO_PATHCONV=1 wsl.exe -d <distro> -e sh -c 'test -x "$HOME/.grok/bin/grok" && "$HOME/.grok/bin/grok" --version'`.
+  If that fails, stop and report: "grok is not installed in WSL <distro>".
+- **Paths.** Convert every Windows path you pass to grok into its WSL
+  form by hand: `C:\a\b` or `/c/a/b` becomes `/mnt/c/a/b` (drive letter
+  lowercased, backslashes to slashes). That covers `<dir>/prompt.md` and
+  the worktree for `--cwd`.
+- **Worktree `.git` file.** A worktree created by Windows git holds an
+  absolute `gitdir: C:/...` line, which Linux git cannot follow. Before
+  launching, if the worktree's `.git` file contains a drive letter,
+  rewrite it to the relative path from the worktree to the same gitdir
+  (`realpath --relative-to=<worktree> <gitdir>`), then confirm
+  `git -C <worktree> status --short` still works on the Windows side.
+  Both gits accept a relative `gitdir:`.
+- **Launch** (one line, foreground, `timeout` 600000):
+  `MSYS_NO_PATHCONV=1 wsl.exe -d <distro> --cd <wsl worktree> -e sh -c 'exec "$HOME/.grok/bin/grok" "$@"' grok --prompt-file <wsl prompt path> --cwd <wsl worktree> --model grok-4.7 --effort xhigh --always-approve --no-plan --sandbox workspace --deny MCPTool`
+  `-e` runs the command without a shell re-parsing your arguments; never
+  use `wsl.exe -- <command string>`, which does re-parse them.
+- **Sandbox check.** Read the event file inside WSL:
+  `MSYS_NO_PATHCONV=1 wsl.exe -d <distro> -e sh -c 'tail -n 20 "$HOME/.grok/sessions/sandbox-events.jsonl"'`
+  and require the last `ProfileApplied` event to carry `"enforced": true`.
+- **Why it holds.** The WSL distro must have Windows interop disabled
+  (`[interop] enabled=false` in `/etc/wsl.conf`, and the `WSLInterop`
+  binfmt entry set to `0`); otherwise a sandboxed process could start a
+  Windows `.exe`, which runs outside Landlock. `/shipyard:doctor` checks
+  this; if it reports interop as enabled, stop instead of launching.
+- Commit from the Windows side as in step 6; grok's sandbox still blocks
+  writes to the main `.git`, so it cannot commit itself.
 - A built-in profile that fails to apply only *warns* and then runs
   unconfined, which you can detect but not prevent — hence the hard stop
   in step 5. A project that wants prevention rather than detection can
