@@ -221,6 +221,19 @@ Once on, an unavailable Mythos model stops the pipeline instead of skipping
 the scan. The agent pins the full ID because the bare `mythos` alias doesn't
 resolve.
 
+## Usage balancing
+
+Weekly limits of Claude, Grok and Codex reset on their own schedules, and quota not used before a reset is lost. With balancing on, the pipeline reads the limits before every wave and routes work so each provider ends its week close to 100% instead of saving quota that will vanish.
+
+Install the monitor once per Windows machine with `/shipyard:usage-setup` (or run `scripts/Install-UsageMonitor.ps1`; `-Remove` uninstalls). It copies `usage-monitor/` to `%LOCALAPPDATA%\cp-AImonitor\service` and registers a per-user logon task, no admin rights. It serves on `127.0.0.1:43821`:
+
+- `/pace` — per provider and window: used %, hours to reset, %/h needed to use the rest, observed %/h and the projection at reset.
+- `/model` — average % per kind of task (plan, review, EASY/ROUTINE/HARD implementation) per provider, learned from the start/end events the pipeline records, and how many of each still fit before reset.
+
+Grok is read through the Grok CLI login, Codex from its local session logs, Claude from numbers the orchestrator records (`rec.ps1`). The monitor stores only percentages and reset times. It polls right before and after every recorded task, every 5 minutes while something runs and every 30 minutes when idle.
+
+Turn balancing on with `SHIPYARD_USAGE_MONITOR=http://127.0.0.1:43821` in `~/.claude/settings.json` under `env`. The task tag then sets the minimum model rather than the only one (`HARD` always stays on Sonnet); reviewer seats never move.
+
 ## How the roles are confined
 
 Every flag in the two grok commands is load-bearing, so don't trim them:
