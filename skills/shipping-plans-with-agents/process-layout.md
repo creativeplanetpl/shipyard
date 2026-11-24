@@ -15,6 +15,7 @@ $SHIPYARD_HOME/
   INDEX.md                  one row per process
   <name>-<yyyymmdd>/
     SPEC.md                 the user's requirements — source of truth, never rewritten by you
+    PARITY.md               only when replacing an existing tool: feature inventory from the code, confirmed by the user before stage 1
     PLAN.md                 plan of record after stage 2
     STATUS.md               stage, open tasks, what waits on the user, last commit/deploy
     DECISIONS.md            the user's decisions and answers, dated, verbatim where short

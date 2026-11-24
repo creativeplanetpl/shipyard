@@ -18,6 +18,14 @@ When unsure, it is shipyard. An explicit "use shipyard" / "use boatyard" from th
 
 **Every run is a process with its own folder.** Read `process-layout.md` next to this file. If the run has no process folder yet, open one before stage 1 (it creates SPEC, PLAN, STATUS, DECISIONS, the `INDEX.md` row and the integration worktrees); record the triage call in STATUS.md. From then on every worktree lives in that process's `wt/`, every review is saved to `reviews/`, every brief to `briefs/`, and STATUS.md is updated whenever the stage changes or you stop to wait for the user. A run that stopped is picked up with `/shipyard:resume <process>`.
 
+**Replacing an existing tool starts with a parity inventory, before stage 1.** When the spec rewrites, ports or replaces something that already exists (a panel, a script, a service, a UI), the new one is assumed to do everything the old one did unless the user says otherwise — "a new clean version" or "for the new workflow" does not narrow that. Before the plan is written:
+
+1. Dispatch a read-only agent to build `PARITY.md` in the process folder **from the code**, not from old docs: every button, window, menu action, command, flag and endpoint a user can reach, with `file:line`, and for each a status — `keep` (same behaviour in the new tool), `moves` (to another system, say where), `drop?` (looks dead or obsolete, with the reason). Old inventory documents are hints only; they go stale.
+2. Show the user the counts and every `drop?` and `moves` row, and stop until they confirm or correct the scope. Record the answer in DECISIONS.md. Pieces the user names as separate tools stay out.
+3. The confirmed PARITY.md is part of the spec: stage 1 maps every `keep` row to a task or to an explicit later wave, and stage 2 and stage 5 reviewers check the plan and the branch against it — a `keep` row with no task is a blocker.
+
+This rule exists because a rewrite once planned only from where the old tool touched an API; about twenty features that never touched the API were silently left out and surfaced only at install time.
+
 ## Cast
 
 | Name | Agent | Model | Access |
