@@ -3,6 +3,55 @@
 Jak pracować z Shipyardem wyłącznie w Claude Desktop (zakładka **Code**), bez
 okien terminala, z wieloma procesami naraz i z wznawianiem w nowym wątku.
 
+## 0. Nowy komputer — instalacja jednym skryptem
+
+`scripts\Install-Shipyard.ps1` stawia Shipyarda tak samo jak na komputerze
+wzorcowym (CP-01). Uruchamia go osoba, która będzie pracować na tym komputerze,
+na swoim koncie Windows, w zwykłym (nie administracyjnym) PowerShellu.
+
+Wcześniej: zainstalowany i zalogowany **Claude Desktop** oraz dostęp konta GitHub
+do `creativeplanetpl/shipyard`.
+
+```
+git clone https://github.com/creativeplanetpl/shipyard.git C:\Scripts\shipyard
+powershell -ExecutionPolicy Bypass -File C:\Scripts\shipyard\scripts\Install-Shipyard.ps1 -CheckOnly
+powershell -ExecutionPolicy Bypass -File C:\Scripts\shipyard\scripts\Install-Shipyard.ps1
+```
+
+(Bez Gita: skrypt można skopiować ręcznie — sam doinstaluje Gita i sklonuje repo.)
+
+`-CheckOnly` tylko raportuje. Skrypt można uruchamiać wielokrotnie; każdy krok
+najpierw sprawdza, czy jest już zrobiony.
+
+| Krok | Co robi skrypt |
+|---|---|
+| Narzędzia | Git i Node.js przez winget, Codex CLI ≥ 0.167 przez npm |
+| Wtyczka | marketplace `shipyard` z `C:\Scripts\shipyard`, `shipyard@shipyard` w zakresie user |
+| Ustawienia | `SHIPYARD_HOME` i `SHIPYARD_USAGE_MONITOR` w `~/.claude/settings.json` (kopia: `settings.json.before-shipyard`) |
+| WSL | użytkownik Linuksa, `bubblewrap`, Node 20, **interop Windows wyłączony** (`/etc/wsl.conf` + `wsl-interop-off.service`) |
+| Grok | Grok CLI wewnątrz WSL — tylko tam jego sandbox działa |
+| Monitor limitów | zadanie „CP AI Monitor” przy logowaniu (`Install-UsageMonitor.ps1`) |
+
+**Jedyny krok dla administratora:** instalacja samego WSL. Gdy dystrybucji
+brakuje, skrypt zatrzymuje się i podaje komendę do uruchomienia w PowerShellu
+jako Administrator, po której trzeba zrestartować Windows i puścić skrypt znowu:
+
+```
+wsl --install -d Ubuntu-24.04 --no-launch
+```
+
+**Czego skrypt nie robi — logowania są osobiste:** Claude Desktop, `codex login`,
+`grok login` w WSL (komendę wypisuje na końcu). Każdy pracuje na własnych
+kontach, więc limity są osobne.
+
+Odbiór: nowy wątek → `/shipyard:doctor`. Każda linia ma być `PASS` albo `N/A`.
+
+**Wspólne zasady a konta.** Podział pracy między modele według limitów jest
+częścią wtyczki (sekcja „Usage balancing” w skillu) i włącza go zmienna
+`SHIPYARD_USAGE_MONITOR`, którą skrypt ustawia. Monitor czyta limity tego konta,
+na którym zalogowany jest dany komputer, więc zasada jest wspólna, a liczby —
+własne.
+
 ## 1. Model pracy
 
 - Wszystko dzieje się w Claude Desktop → **Code**. Nowy wątek dodajesz plusem;
