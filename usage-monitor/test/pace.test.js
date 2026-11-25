@@ -40,3 +40,14 @@ test("history keeps no notes or errors", async () => {
   const line = fs.readFileSync(file, "utf8");
   assert.ok(!line.includes("secret") && !line.includes('"error"'));
 });
+
+test("a reset time in the past marks the window stale", () => {
+  const { computePace } = require("../server.js");
+  const now = new Date("2026-11-25T10:00:00Z");
+  const out = computePace({ providers: [{ id: "claude", windows: [
+    { label: "7 days", used: 95, resetsAt: "2026-11-25T02:00:00Z" },
+    { label: "5 hours", used: 10, resetsAt: "2026-11-25T12:00:00Z" },
+  ] }] }, [], now);
+  assert.equal(out.windows.find((w) => w.label === "7 days").stale, true);
+  assert.equal(out.windows.find((w) => w.label === "5 hours").stale, false);
+});

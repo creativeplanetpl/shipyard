@@ -3,7 +3,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { readLatestUsage } = require("./codex-usage.js");
-const { readGrokUsage } = require("./grok-usage.js");
+const { readGrokUsage, cliRefresh } = require("./grok-usage.js");
 
 const SNAPSHOT_LIMIT_BYTES = 64 * 1024;
 const EXTENSION_ORIGIN = /^chrome-extension:\/\/[a-p]{32}$/;
@@ -71,7 +71,7 @@ async function mergeProvider(snapshotFile, provider) {
 
 // Background poll without Chrome: Grok (CLI login) and Codex (local logs).
 async function pollOnce(root, snapshotFile, options = {}) {
-  const grok = await (options.readGrok || readGrokUsage)().catch(() => ({ state: "unavailable", windows: [] }));
+  const grok = await (options.readGrok || (() => readGrokUsage({ refresh: cliRefresh })))().catch(() => ({ state: "unavailable", windows: [] }));
   await mergeProvider(snapshotFile, { id: "grok", ...grok });
   const codex = await (options.readCodex || readLatestUsage)(root).catch(() => ({ state: "unavailable", windows: [] }));
   const snapshot = await mergeProvider(snapshotFile, { id: "chatgpt", ...codex });
@@ -143,6 +143,8 @@ function computePace(snapshot, history, now = new Date(), windowHours = 6) {
         remaining,
         resetsAt: window.resetsAt,
         hoursLeft: round(hoursLeft),
+        // A reset time in the past means the reading is from an earlier period: do not plan with it.
+        stale: Number.isFinite(resetMs) ? resetMs <= now.getTime() : false,
         neededPerHour: round(neededPerHour),
         observedPerHour: round(observedPerHour),
         projectedAtReset: observedPerHour === null || hoursLeft === null ? null : round(Math.min(100, window.used + observedPerHour * hoursLeft)),
@@ -196,6 +198,12 @@ function createServer(root, options = {}) {
             .map((w) => ({ label: word(w.label), used: w.used, resetsAt: typeof w.resetsAt === "string" ? w.resetsAt.slice(0, 40) : null }));
           if (!windows.length) return send(400, { error: "No windows" });
           await appendHistory(historyFileFor(snapshotFile), { providers: [{ id: word(body.provider), windows }] });
+          // Claude has no background reader: a local reading (rec.ps1 from get_usage) also updates the snapshot,
+          // so /pace stops showing an old extension reading. Labels follow the snapshot names.
+          if (body.provider === "claude") {
+            const label = (l) => (/week|7/i.test(l) ? "7 days" : /5/.test(l) ? "5 hours" : l);
+            await mergeProvider(snapshotFile, { id: "claude", state: "ready", source: "local reading", windows: windows.map((w) => ({ ...w, label: label(w.label) })) });
+          }
           return send(200, { ok: true });
         }
         if (body?.type === "task" && word(body.id) && word(body.provider) && word(body.kind) && (body.phase === "start" || body.phase === "end")) {

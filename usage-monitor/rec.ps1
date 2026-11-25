@@ -10,8 +10,8 @@ function Send-Record($body) {
   Invoke-RestMethod -Method Post -Uri $uri -ContentType 'application/json' -Body ($body | ConvertTo-Json -Depth 5 -Compress) | Out-Null
 }
 if ($null -ne $ClaudeWeekly) {
-  $windows = @(@{ label = 'Weekly all models'; used = $ClaudeWeekly; resetsAt = $ClaudeReset })
-  if ($null -ne $Claude5h) { $windows += @{ label = '5-hour'; used = $Claude5h; resetsAt = $Claude5hReset } }
+  $windows = @(@{ label = '7 days'; used = $ClaudeWeekly; resetsAt = $ClaudeReset })
+  if ($null -ne $Claude5h) { $windows += @{ label = '5 hours'; used = $Claude5h; resetsAt = $Claude5hReset } }
   Send-Record @{ type = 'usage'; provider = 'claude'; windows = $windows }
 }
 if ($Task) { Send-Record @{ type = 'task'; id = $Task; provider = $Provider; kind = $Kind; phase = $Phase } }

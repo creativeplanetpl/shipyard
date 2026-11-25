@@ -53,3 +53,23 @@ test("background poll stores Grok and Codex in the snapshot and keeps Claude", a
   assert.equal(byId.chatgpt.windows[0].used, 12);
   assert.equal(byId.claude.windows[0].used, 51);
 });
+
+test("expired login: asks the CLI to refresh once, then reads again", async (t) => {
+  const { file } = await authFile(t, { key: "old", expires_at: "2000-01-01T00:00:00Z" });
+  let refreshed = 0;
+  const result = await readGrokUsage({
+    authFile: file,
+    refresh: async () => { refreshed++; await fs.writeFile(file, JSON.stringify({ "https://auth.x.ai::x": { key: "new", expires_at: "2099-01-01T00:00:00Z" } })); },
+    fetch: async (url, init) => { assert.equal(init.headers.Authorization, "Bearer new"); return { ok: true, status: 200, json: async () => billing }; },
+  });
+  assert.equal(refreshed, 1);
+  assert.equal(result.state, "ready");
+});
+
+test("refresh that does not help leaves the reading unavailable, one attempt only", async (t) => {
+  const { file } = await authFile(t, { key: "old", expires_at: "2000-01-01T00:00:00Z" });
+  let refreshed = 0;
+  const result = await readGrokUsage({ authFile: file, refresh: async () => { refreshed++; }, fetch: () => assert.fail() });
+  assert.equal(refreshed, 1);
+  assert.match(result.note, /expired/);
+});

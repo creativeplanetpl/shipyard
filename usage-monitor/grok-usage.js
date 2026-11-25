@@ -2,7 +2,9 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 
-// Same endpoint the Grok CLI uses for /usage. Read-only: we never refresh or rewrite credentials.
+// Same endpoint the Grok CLI uses for /usage. The monitor never writes credentials itself; when the
+// login has expired it may ask the Grok CLI to refresh its own login (options.refresh, e.g. `grok models`,
+// which spends no credits) and then reads auth.json again, once.
 const BILLING_URL = "https://cli-chat-proxy.grok.com/v1/billing?format=credits";
 
 function defaultAuthFile() {
@@ -22,6 +24,21 @@ function expired(entry, now) {
 }
 
 async function readGrokUsage(options = {}) {
+  const first = await readGrokUsageOnce(options);
+  if (first.state === "ready" || typeof options.refresh !== "function" || !/expired|rejected/.test(first.note || "")) return first;
+  try { await options.refresh(); } catch { return first; }
+  return readGrokUsageOnce({ ...options, now: Date.now() });
+}
+
+// Default refresh: run the Grok CLI once with a command that lists models (no prompt, no credits).
+function cliRefresh() {
+  const { execFile } = require("node:child_process");
+  return new Promise((resolve) => {
+    execFile("grok", ["models"], { timeout: 60_000, windowsHide: true, shell: process.platform === "win32" }, () => resolve());
+  });
+}
+
+async function readGrokUsageOnce(options = {}) {
   const authFile = options.authFile || defaultAuthFile();
   const fetchImpl = options.fetch || fetch;
   const now = options.now || Date.now();
@@ -67,4 +84,4 @@ async function readGrokUsage(options = {}) {
   };
 }
 
-module.exports = { readGrokUsage, BILLING_URL };
+module.exports = { readGrokUsage, cliRefresh, BILLING_URL };
