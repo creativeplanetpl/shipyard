@@ -22,6 +22,11 @@ the status call.
 
 1. **Claude** — `claude auth status --json`. Pass if `loggedIn` is true. Report
    `authMethod` and `loginExpiresAt`; warn if it expires within 3 days.
+   If `command -v claude` finds nothing, report `N/A (no claude CLI on PATH;
+   this session is itself signed in)` and move on at once. **Do not search
+   the disk for a Claude executable** — the pipeline never calls the CLI, a
+   scan of user folders can hang for minutes on network drives, and you are
+   running inside a signed-in Claude already.
 2. **Codex** — `codex login status`. Pass only on a `Logged in …` line; report
    the method it names (ChatGPT / API key).
 3. **Grok** — skip with a note if `SHIPYARD_NO_GROK` is set. Otherwise
