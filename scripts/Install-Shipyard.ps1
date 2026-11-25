@@ -50,14 +50,24 @@ function To-WslPath([string]$p) {
   '/mnt/' + $full.Substring(0, 1).ToLower() + ($full.Substring(2) -replace '\\', '/')
 }
 # wsl.exe prints UTF-16; strip the NULs so the output can be compared.
-function Wsl-Text { (& wsl.exe @args 2>$null | Out-String) -replace "`0", '' }
+# Windows PowerShell turns a native program's stderr into a terminating error when
+# $ErrorActionPreference is Stop, so probes run with it relaxed (wsl.exe writes to
+# stderr when WSL itself is not installed).
+function Wsl-Text {
+  $ErrorActionPreference = 'SilentlyContinue'
+  try { (& wsl.exe @args 2>$null | Out-String) -replace "`0", '' } catch { '' }
+}
+function Quiet-Text([scriptblock]$block) {
+  $ErrorActionPreference = 'SilentlyContinue'
+  try { (& $block 2>$null | Out-String) } catch { '' }
+}
 # Bash goes to WSL as a file, never as a command-line string: Windows PowerShell
 # drops embedded double quotes when it passes arguments to a native program.
 function Run-InWsl([string]$user, [string]$bash, [switch]$Probe) {
   $file = Join-Path $env:TEMP ("shipyard-setup-{0}.sh" -f ([guid]::NewGuid().ToString('N')))
   [IO.File]::WriteAllText($file, ($bash -replace "`r`n", "`n"), (New-Object Text.UTF8Encoding($false)))
   try {
-    if ($Probe) { return ((& wsl.exe -d $Distro -u $user -e bash (To-WslPath $file) 2>$null | Out-String) -replace "`0", '') }
+    if ($Probe) { return (Wsl-Text -d $Distro -u $user -e bash (To-WslPath $file)) }
     & wsl.exe -d $Distro -u $user -e bash (To-WslPath $file)
     if ($LASTEXITCODE -ne 0) { throw "WSL step failed (user $user, exit $LASTEXITCODE)." }
   } finally { Remove-Item $file -Force -ErrorAction SilentlyContinue }
@@ -138,13 +148,13 @@ else { New-Item -ItemType Directory -Force $ShipyardHome | Out-Null; Say 'DONE' 
 
 # --- 4. Plugin registration ---------------------------------------------------
 if (Have 'claude') {
-  $listed = ((& claude plugin list 2>$null) | Out-String) -match 'shipyard@shipyard'
+  $listed = (Quiet-Text { claude plugin list }) -match 'shipyard@shipyard'
   if ($listed) { Say 'OK' 'Shipyard plugin' 'installed' }
   elseif ($CheckOnly) { Say 'MISSING' 'Shipyard plugin' 'would register the marketplace and install shipyard@shipyard' }
   else {
     & claude plugin marketplace add $ShipyardPath | Out-Null
     & claude plugin install 'shipyard@shipyard' --scope user | Out-Null
-    $listed = ((& claude plugin list 2>$null) | Out-String) -match 'shipyard@shipyard'
+    $listed = (Quiet-Text { claude plugin list }) -match 'shipyard@shipyard'
     if ($listed) { Say 'DONE' 'Shipyard plugin' 'installed, user scope' }
     else { Say 'FAIL' 'Shipyard plugin' 'claude plugin install did not register it'; $script:failed = $true }
   }
