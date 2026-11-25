@@ -159,8 +159,8 @@ if (Have 'claude') {
     else { Say 'FAIL' 'Shipyard plugin' 'claude plugin install did not register it'; $script:failed = $true }
   }
 } else {
-  Say 'TODO' 'Shipyard plugin' 'the claude command is not on PATH'
-  $script:todo.Add("In Claude Desktop > Code, type:  /plugin marketplace add $ShipyardPath   then   /plugin install shipyard@shipyard")
+  Say 'TODO' 'Shipyard plugin' 'no claude command on PATH; settings.json already enables it'
+  $script:todo.Add("Plugin: open a NEW thread in Claude Desktop > Code and type /shipyard:doctor in the message box (not in PowerShell). If the command is unknown, run here:  npm install -g @anthropic-ai/claude-code  and re-run this script.")
 }
 
 # --- 5. WSL + Grok ------------------------------------------------------------
