@@ -29,7 +29,7 @@ najpierw sprawdza, czy jest już zrobiony.
 | Wtyczka | marketplace `shipyard` z `C:\Scripts\shipyard`, `shipyard@shipyard` w zakresie user |
 | Ustawienia | `SHIPYARD_HOME` i `SHIPYARD_USAGE_MONITOR` w `~/.claude/settings.json` (kopia: `settings.json.before-shipyard`) |
 | WSL | użytkownik Linuksa, `bubblewrap`, Node 20, **interop Windows wyłączony** (`/etc/wsl.conf` + `wsl-interop-off.service`) |
-| Grok | Grok CLI wewnątrz WSL — tylko tam jego sandbox działa |
+| Grok | Grok CLI wewnątrz WSL (implementer — tylko tam działa sandbox) oraz na Windowsie (recenzent — tylko czyta, bez narzędzi zapisu) |
 | Monitor limitów | zadanie „CP AI Monitor” przy logowaniu (`Install-UsageMonitor.ps1`) |
 
 **Jedyny krok dla administratora:** instalacja samego WSL. Gdy dystrybucji
@@ -41,7 +41,7 @@ wsl --install -d Ubuntu-24.04 --no-launch
 ```
 
 **Czego skrypt nie robi — logowania są osobiste:** Claude Desktop, `codex login`,
-`grok login` w WSL (komendę wypisuje na końcu). Każdy pracuje na własnych
+`grok login` dwa razy — w WSL i na Windowsie (komendy wypisuje na końcu). Każdy pracuje na własnych
 kontach, więc limity są osobne.
 
 Odbiór: nowy wątek → `/shipyard:doctor`. Każda linia ma być `PASS` albo `N/A`.

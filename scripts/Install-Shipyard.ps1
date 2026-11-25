@@ -1,6 +1,7 @@
 # Sets up Shipyard on a Windows workstation the same way as the reference machine:
 #   - Git, Node.js and the Codex CLI on Windows,
-#   - WSL 2 + Ubuntu with the Grok CLI inside it (Landlock sandbox, Windows interop off),
+#   - WSL 2 + Ubuntu with the Grok CLI inside it (Landlock sandbox, Windows interop off)
+#     for the implementer, and the Grok CLI on Windows for the read-only reviewer,
 #   - the Shipyard plugin from a local checkout, user scope,
 #   - SHIPYARD_HOME and SHIPYARD_USAGE_MONITOR in ~/.claude/settings.json,
 #   - the usage monitor ("CP AI Monitor" logon task).
@@ -251,6 +252,24 @@ ln -sf /etc/systemd/system/wsl-interop-off.service /etc/systemd/system/multi-use
       $script:todo.Add("Grok sign-in (inside WSL):  wsl -d $Distro -e sh -c '`$HOME/.grok/bin/grok login'")
     } elseif ($CheckOnly) { Say 'MISSING' 'Grok CLI in WSL' 'no Linux user yet; would create one and install' }
   }
+}
+
+# --- 5b. Grok on Windows (reviewer) --------------------------------------------
+# grok-reviewer runs the Windows binary: it gets read-only tools and deny rules
+# and no shell, so it cannot write. Only the implementer needs the WSL sandbox.
+if (-not $SkipGrok) {
+  $winGrok = Join-Path $env:USERPROFILE '.grok\bin\grok.exe'
+  if ((Have 'grok') -or (Test-Path $winGrok)) {
+    $exe = if (Have 'grok') { 'grok' } else { $winGrok }
+    Say 'OK' 'Grok CLI on Windows' ((Quiet-Text { & $exe --version }).Trim())
+  } elseif ($CheckOnly) { Say 'MISSING' 'Grok CLI on Windows' 'would install with the x.ai PowerShell installer' }
+  else {
+    Invoke-Expression (Invoke-RestMethod 'https://x.ai/cli/install.ps1') | Out-Null
+    Refresh-Path
+    if (Test-Path $winGrok) { Say 'DONE' 'Grok CLI on Windows' ((Quiet-Text { & $winGrok --version }).Trim()) }
+    else { Say 'FAIL' 'Grok CLI on Windows' 'installer finished but ~\.grok\bin\grok.exe is missing'; $script:failed = $true }
+  }
+  $script:todo.Add('Grok sign-in on Windows (open a NEW terminal first):  grok login')
 }
 
 # --- 6. Usage monitor ---------------------------------------------------------
