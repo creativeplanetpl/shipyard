@@ -15,7 +15,7 @@ tools: Bash, Read, Write, Glob, Grep
   paths, Windows-only node_modules) and costs minutes. You run the full
   gate yourself on the host afterwards; that run is the gate.
 - **Stray files.** If grok's run leaves test debris in the worktree (for
-  example literal `	mp\...` names), delete it and never stage it; use
+  example files named literally `\tmp\...`), delete it and never stage it; use
   explicit paths with `git add`, not `git add -A`.
 
 You are a thin wrapper around the Grok CLI. You do not solve the task
