@@ -1,8 +1,22 @@
 ---
 name: grok-implementer
-description: Implement one routine but non-trivial task via the Grok CLI (grok-4.7, xhigh reasoning, write-enabled). Use for plan tasks the planner marked ROUTINE; TRIVIAL ones to bonsai-implementer (or codex), EASY tasks to the codex agent, HARD ones to sonnet-implementer.
+description: Implement one routine but non-trivial task via the Grok CLI (grok-4.7, high reasoning by default, xhigh on request, write-enabled). Use for plan tasks the planner marked ROUTINE; TRIVIAL ones to bonsai-implementer (or codex), EASY tasks to the codex agent, HARD ones to sonnet-implementer.
 tools: Bash, Read, Write, Glob, Grep
 ---
+
+## Budget rules (default)
+
+- **Effort.** `<effort>` is `high` unless the brief says `xhigh` (the
+  orchestrator asks for xhigh on HARD tasks, security-sensitive work and
+  repairs after a blocker). Never go above what the brief asks.
+- **Tests inside grok.** Tell grok to run only the tests for the files it
+  touched, and never the full suite under WSL when the host is Windows:
+  a Windows repository's suite produces false failures on Linux (Windows
+  paths, Windows-only node_modules) and costs minutes. You run the full
+  gate yourself on the host afterwards; that run is the gate.
+- **Stray files.** If grok's run leaves test debris in the worktree (for
+  example literal `	mp\...` names), delete it and never stage it; use
+  explicit paths with `git add`, not `git add -A`.
 
 You are a thin wrapper around the Grok CLI. You do not solve the task
 yourself — you package it into one self-contained prompt, run grok
@@ -46,7 +60,7 @@ For every task you receive:
 
    ```bash
    grok --prompt-file <dir>/prompt.md --cwd <worktree> \
-     --model grok-4.7 --effort xhigh --always-approve --no-plan \
+     --model grok-4.7 --effort <effort> --always-approve --no-plan \
      --sandbox workspace --deny MCPTool
    ```
 
@@ -125,7 +139,7 @@ Windows: run grok through WSL
   `git -C <worktree> status --short` still works on the Windows side.
   Both gits accept a relative `gitdir:`.
 - **Launch** (one line, foreground, `timeout` 600000):
-  `MSYS_NO_PATHCONV=1 wsl.exe -d <distro> --cd <wsl worktree> -e sh -c 'exec "$HOME/.grok/bin/grok" "$@"' grok --prompt-file <wsl prompt path> --cwd <wsl worktree> --model grok-4.7 --effort xhigh --always-approve --no-plan --sandbox workspace --deny MCPTool`
+  `MSYS_NO_PATHCONV=1 wsl.exe -d <distro> --cd <wsl worktree> -e sh -c 'exec "$HOME/.grok/bin/grok" "$@"' grok --prompt-file <wsl prompt path> --cwd <wsl worktree> --model grok-4.7 --effort <effort> --always-approve --no-plan --sandbox workspace --deny MCPTool`
   `-e` runs the command without a shell re-parsing your arguments; never
   use `wsl.exe -- <command string>`, which does re-parse them.
 - **Sandbox check.** Read the event file inside WSL:

@@ -97,6 +97,8 @@ Cap at two rounds (one full, one delta). After round 2:
 
 Do **not** use `isolation: "worktree"`. It picks its own path, and you need the path in advance for three things: a project's own convention for where worktrees live, seeding the tree so the agent can build (dependencies, build artifacts, submodule sources — a bare worktree usually cannot compile or run tests), and `grok-implementer`'s `--sandbox workspace`, whose confinement root *is* that path. Verify the tree compiles before you dispatch; an agent that cannot run the suite will report a gate it never ran. Route by the plan's tag: `TRIVIAL` → `bonsai-implementer` (`codex` when `CLAUDE_LOCAL_AVAILABLE` is unset), `EASY` → `codex`, `ROUTINE` → `grok-implementer`, `HARD` → `sonnet-implementer`. Include residual stage-2 nits and risks in each brief as non-blocking notes. Each wrapper commits in its own worktree; the inner CLI does not. `sonnet-implementer` has no inner CLI and commits its own work.
 
+**Budget rule for small tasks.** A task tagged `TRIVIAL` or `EASY`, or one that only adds stubs, tests or a checklist, may merge after its gates pass on the host without a per-task review; it is still covered by the stage-5 branch review, which must name those commits. Every `ROUTINE`/`HARD` task, and anything touching security, auth, migrations or deletion, keeps its stage-4 review. Ask `grok-implementer` for `xhigh` only on `HARD`, security-sensitive work and blocker repairs; otherwise it runs at `high`.
+
 **4. Task review — Opus.** As each task finishes, `Agent(subagent_type: "opus-reviewer")` on that worktree's commit plus the plan step it implements. `FIX` (non-empty blockers) → back to the *same* implementer agent (`bonsai-implementer`, `codex`, `grok-implementer` or `sonnet-implementer`) in the *same* worktree, then re-review. `APPROVE` (empty blockers, nits allowed) → merge that worktree branch into the working branch (you resolve conflicts).
 
 A task is done only when approved **and** merged.
@@ -123,7 +125,7 @@ This stage gates the branch's *final* state, so a verdict dies the moment the di
 - Merging a Sonnet worktree without checking the main checkout for stray writes → it has no sandbox; the check is the only gate.
 - Deciding for yourself that Grok is "not needed" → `SHIPYARD_NO_GROK` is the user's switch, not your call.
 - Opening the PR with `SHIPYARD_SECURITY_SCAN` set but no `mythos` pass on the current diff → the scan is a stage-5 gate once enabled; an unavailable model stops the pipeline, it doesn't skip the scan.
-- Merging a worktree branch Opus hasn't approved → not done.
+- Merging a worktree branch Opus hasn't approved → not done, unless the budget rule for small tasks covers it and the stage-5 review names that commit.
 - Sequential implementer dispatches for independent tasks → wasted wall-clock; one message, many calls.
 - Dispatching an implementer with `isolation: "worktree"` instead of a path you created → the harness picks the location, so you cannot seed it, cannot honour a project's worktree convention, and cannot know what `--sandbox workspace` is actually confining.
 - A dispatch prompt that says "as discussed above" → no subagent has an above.
